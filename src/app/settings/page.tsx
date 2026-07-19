@@ -2,6 +2,7 @@
 
 import { Bell, Globe, Moon, Shield } from "lucide-react";
 import { SUPPORTED_LANGUAGES } from "@/constants";
+import { useAuth } from "@/components/providers/auth-provider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -14,8 +15,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/toaster";
+import type { SupportedLanguage } from "@/types";
 
 export default function SettingsPage() {
+  const { preferences, setLanguage } = useAuth();
+
   return (
     <div className="container mx-auto max-w-2xl px-4 py-8">
       <div className="mb-8">
@@ -27,22 +31,23 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Globe className="h-5 w-5" />
+              <Globe className="h-5 w-5" aria-hidden="true" />
               Language & Region
             </CardTitle>
             <CardDescription>Choose your preferred language for AI responses</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <Label>Language</Label>
+              <Label htmlFor="language-select">Language</Label>
               <Select
-                defaultValue="en"
+                value={preferences.language}
                 onValueChange={(v) => {
+                  setLanguage(v as SupportedLanguage);
                   const lang = SUPPORTED_LANGUAGES.find((l) => l.code === v);
-                  toast({ title: "Language updated", description: `Set to ${lang?.label}` });
+                  toast({ title: "Language updated", description: `Set to ${lang?.label}. AI chat will use this preference.` });
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger id="language-select">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -60,7 +65,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Bell className="h-5 w-5" />
+              <Bell className="h-5 w-5" aria-hidden="true" />
               Notifications
             </CardTitle>
             <CardDescription>Manage alerts and updates</CardDescription>
@@ -85,7 +90,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Moon className="h-5 w-5" />
+              <Moon className="h-5 w-5" aria-hidden="true" />
               Appearance
             </CardTitle>
             <CardDescription>Theme is controlled via the header toggle</CardDescription>
@@ -100,25 +105,25 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Shield className="h-5 w-5" />
+              <Shield className="h-5 w-5" aria-hidden="true" />
               Privacy
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Share location for routing</Label>
+                <Label htmlFor="share-location">Share location for routing</Label>
                 <p className="text-sm text-muted-foreground">Improve route recommendations</p>
               </div>
-              <Switch defaultChecked />
+              <Switch id="share-location" defaultChecked />
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div>
-                <Label>Analytics</Label>
+                <Label htmlFor="analytics">Analytics</Label>
                 <p className="text-sm text-muted-foreground">Help improve the platform</p>
               </div>
-              <Switch />
+              <Switch id="analytics" />
             </div>
           </CardContent>
         </Card>

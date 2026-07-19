@@ -1,20 +1,14 @@
-import { config, isAIConfigured, isFirebaseConfigured, isMapsConfigured } from "@/config";
+import { config } from "@/config";
 import { successResponse } from "@/lib/api-response";
 
+/**
+ * Public health check — intentionally avoids disclosing which secrets are configured.
+ */
 export async function GET() {
-  const checks = {
-    ai: isAIConfigured(),
-    firebase: isFirebaseConfigured(),
-    maps: isMapsConfigured(),
-  };
-
-  const status = "healthy";
-
   return successResponse({
-    status,
+    status: "ok",
     version: config.app.version,
     name: config.app.name,
     timestamp: new Date().toISOString(),
-    checks,
   });
 }

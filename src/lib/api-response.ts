@@ -49,11 +49,26 @@ export function errorResponse(
   );
 }
 
-/** Extract client IP from request headers (supports proxies) */
+/**
+ * Extract client IP from request headers.
+ * Prefer platform-provided identity headers over the first X-Forwarded-For hop
+ * (which clients can spoof when not stripped by a trusted proxy).
+ */
 export function getClientIp(request: Request): string {
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  if (realIp) return realIp;
+
+  const vercelForwarded = request.headers.get("x-vercel-forwarded-for");
+  if (vercelForwarded) {
+    return vercelForwarded.split(",")[0]?.trim() ?? "anonymous";
+  }
+
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    return forwarded.split(",")[0]?.trim() ?? "anonymous";
+    // Use the last hop when a trusted proxy appends the true client IP.
+    const parts = forwarded.split(",").map((part) => part.trim()).filter(Boolean);
+    return parts.at(-1) ?? "anonymous";
   }
-  return request.headers.get("x-real-ip") ?? "anonymous";
+
+  return "anonymous";
 }

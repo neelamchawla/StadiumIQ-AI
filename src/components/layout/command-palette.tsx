@@ -26,11 +26,20 @@ export function CommandPalette({ open: controlledOpen, onOpenChange }: CommandPa
         event.preventDefault();
         setOpen(!open);
       }
+      if (event.key === "Escape" && open) {
+        event.preventDefault();
+        setOpen(false);
+      }
+      if (event.key === "/" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        setOpen(false);
+        router.push("/chat");
+      }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, setOpen]);
+  }, [open, setOpen, router]);
 
   const navigate = (href: string) => {
     setOpen(false);

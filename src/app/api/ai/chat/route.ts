@@ -2,10 +2,14 @@ import { config } from "@/config";
 import { errorResponse, getClientIp, successResponse } from "@/lib/api-response";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizePromptInput } from "@/lib/sanitize";
-import { chatRequestSchema } from "@/schemas";
-import { generateWithGemini } from "@/services/ai/gemini.server";
-import { SYSTEM_PROMPTS } from "@/services/ai/prompts";
 import { generateId } from "@/lib/utils";
+import { chatRequestSchema } from "@/schemas";
+import {
+  buildStadiumContext,
+  formatContextBlock,
+  sanitizeAIContext,
+} from "@/services/ai/context";
+import { generateWithGemini } from "@/services/ai/gemini.server";
 
 export async function POST(request: Request) {
   try {
@@ -28,20 +32,26 @@ export async function POST(request: Request) {
       return errorResponse("Invalid request body", 400, "VALIDATION_ERROR", parsed.error.flatten());
     }
 
-    const { message, feature, language, context } = parsed.data;
-    const sanitizedMessage = sanitizePromptInput(message);
+    const { message, feature, language } = parsed.data;
+    const safeContext = sanitizeAIContext(parsed.data.context);
+    const stadiumContext = buildStadiumContext(feature, {
+      ...safeContext,
+      language: safeContext.language ?? language,
+    });
 
-    const contextBlock = context ? `\nContext:\n${JSON.stringify(context)}` : "";
-    const languageBlock = language ? `\nPreferred language: ${language}` : "";
-    const prompt = `${SYSTEM_PROMPTS[feature]}${languageBlock}${contextBlock}\n\nUser: ${sanitizedMessage}`;
-
-    const result = await generateWithGemini({ feature, prompt });
+    const result = await generateWithGemini({
+      feature,
+      userPrompt: sanitizePromptInput(message),
+      language,
+      contextBlock: formatContextBlock(stadiumContext),
+    });
 
     return successResponse({
       id: generateId(),
       message: result.message,
       confidence: result.confidence,
       feature,
+      source: result.source,
       conversationId: parsed.data.conversationId ?? generateId(),
     });
   } catch (error) {

@@ -32,10 +32,10 @@ export function getCongestionColor(
   level: "low" | "moderate" | "high" | "critical",
 ): string {
   const colors = {
-    low: "text-green-500 bg-green-500/10",
-    moderate: "text-yellow-500 bg-yellow-500/10",
-    high: "text-orange-500 bg-orange-500/10",
-    critical: "text-red-500 bg-red-500/10",
+    low: "text-green-800 bg-green-500/15 dark:text-green-300",
+    moderate: "text-amber-800 bg-amber-500/15 dark:text-amber-300",
+    high: "text-orange-800 bg-orange-500/15 dark:text-orange-300",
+    critical: "text-red-800 bg-red-500/15 dark:text-red-300",
   };
   return colors[level];
 }

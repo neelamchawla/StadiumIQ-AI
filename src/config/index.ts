@@ -22,13 +22,8 @@ export const config = {
     messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "",
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
   },
-  firebaseAdmin: {
-    projectId: getEnv("FIREBASE_ADMIN_PROJECT_ID"),
-    clientEmail: getEnv("FIREBASE_ADMIN_CLIENT_EMAIL"),
-    privateKey: getEnv("FIREBASE_ADMIN_PRIVATE_KEY").replace(/\\n/g, "\n"),
-  },
   ai: {
-    provider: (process.env.AI_PROVIDER ?? "gemini") as "gemini" | "openai",
+    provider: (process.env.AI_PROVIDER ?? "gemini") as "gemini",
     geminiApiKey: getEnv("GEMINI_API_KEY"),
     model: process.env.AI_MODEL ?? "gemini-2.0-flash",
     maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? "2048", 10),
@@ -37,12 +32,9 @@ export const config = {
   maps: {
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
   },
-  security: {
-    csrfSecret: process.env.CSRF_SECRET ?? "development-csrf-secret",
-  },
 } as const;
 
-/** Check if Firebase is configured */
+/** Check if Firebase client config is present (optional production path) */
 export function isFirebaseConfigured(): boolean {
   return Boolean(
     config.firebase.apiKey &&
@@ -56,7 +48,7 @@ export function isAIConfigured(): boolean {
   return Boolean(config.ai.geminiApiKey);
 }
 
-/** Check if Google Maps is configured */
+/** Check if Google Maps is configured (optional; map UI works without it) */
 export function isMapsConfigured(): boolean {
   return Boolean(config.maps.apiKey);
 }

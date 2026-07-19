@@ -1,26 +1,85 @@
-# FIFA Stadium Intelligence AI
+# StadiumIQ-AI
 
-AI-powered digital command center for FIFA World Cup 2026 — helping fans, volunteers, and organizers navigate stadiums, predict crowd congestion, and respond to incidents in real time.
+**Unofficial concept demo** — AI-powered stadium intelligence for FIFA World Cup 2026 match days.
 
-## Features
+Helps fans pick the best entrance, supports accessible routing, guides emergencies, and connects volunteer incident reports to organizer operations.
 
-- **FIFA AI Assistant** — Multilingual chat for navigation, schedules, and FAQs
-- **Crowd Prediction** — Real-time gate congestion and wait time predictions
-- **Route Recommendation** — Optimal paths based on accessibility and crowd levels
-- **Accessibility Assistant** — Voice-enabled guidance for all accessibility needs
-- **Emergency AI** — Instant emergency guidance and evacuation routes
-- **Sustainability Coach** — Track environmental impact at the venue
-- **Volunteer & Organizer Tools** — Shift briefings, incident reporting, and operational intelligence
+> Not affiliated with FIFA. Built as a challenge submission demonstrating a smart, context-aware assistant.
+
+## Chosen Vertical
+
+**Stadium / large-event operations intelligence** for three personas:
+
+| Persona | Primary job-to-be-done |
+|---------|------------------------|
+| Fan | Get into the venue fast (optionally via an accessible gate) |
+| Volunteer | Report incidents that ops can act on |
+| Organizer | See live crowd pressure + incident queue + AI briefing |
+
+## Approach & Logic
+
+1. **Deterministic decision engine first** — `recommendBestGate()` scores open gates by wait time, congestion, and accessibility constraints.
+2. **AI second, with stadium context** — Chat/emergency/accessibility/organizer calls go through a **server action** that injects allowlisted context (gates, weather, help centers, role, accessibility needs).
+3. **Graceful offline demo** — Without `GEMINI_API_KEY`, the server returns useful fallback guidance grounded in the same stadium snapshot (no broken UI).
+4. **Honest demo auth** — Header role switcher (fan / volunteer / organizer) for judges; not production RBAC.
+
+```mermaid
+flowchart LR
+  UI[Persona UI] --> Action[sendChatMessage / submitIncident]
+  Action --> Context[Stadium context builder]
+  Context --> Gemini[Gemini or fallback]
+  Action --> Store[Incident store]
+  Store --> Organizer[Organizer dashboard]
+  Gates[Gate decision engine] --> Hero[Get Me In]
+```
+
+## How the Solution Works
+
+### Fan path (high impact)
+
+1. Open `/` → **Get Me In — Best Gate Now**
+2. Toggle accessible entrance if needed
+3. Follow the recommended gate / ask AI Chat for directions
+4. Use Stadium Map + Emergency panel for in-venue help
+
+### Volunteer → Organizer loop
+
+1. Switch role to **Volunteer** → Report Incident
+2. Switch role to **Organizer** → new report appears in Active Incidents
+3. Refresh AI operations summary for a briefing that includes stadium context
+
+### AI path (secure)
+
+- UI → `askStadiumAI` → `sendChatMessage` (server only)
+- `POST /api/ai/generate` is **disabled** (no raw-prompt proxy)
+- Rate limiting + Zod validation + context allowlisting
+
+## Demo vs Production
+
+| Capability | Demo (default) | Production seam |
+|------------|----------------|-----------------|
+| Gate / crowd data | Simulated MetLife Stadium with time wobble | Replace `stadium/data.ts` with live feeds / Firestore |
+| AI answers | Gemini if key set, else stadium-aware fallback | Same server path |
+| Auth / roles | localStorage demo switcher | Firebase Auth + server token verify |
+| Maps | CSS stadium map | Optional Google Maps key |
+| Incidents | Process-local store | Firestore + notifications |
+| Rate limits | In-memory per instance | Redis / Vercel KV |
+
+## 3-Minute Judge Script
+
+1. `npm install && npm run dev` → open `http://localhost:3000`
+2. Use **Get Me In**; toggle accessible entrance
+3. Open **AI Chat**, ask: “Which gate should I use with a wheelchair?”
+4. Switch role → **Volunteer**, submit an incident
+5. Switch role → **Organizer**, confirm the incident and AI summary
+6. Optional: set `GEMINI_API_KEY` in `.env.local` and repeat chat
 
 ## Tech Stack
 
-- **Framework:** Next.js 15 (App Router)
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS + Radix UI
-- **AI:** Google Gemini (`@google/generative-ai`)
-- **Validation:** Zod
-- **Testing:** Vitest + Playwright + axe-core
-- **Deployment:** Vercel
+- Next.js 15 (App Router) · TypeScript · Tailwind · Radix UI
+- Google Gemini (`@google/generative-ai`) — optional
+- Zod · Vitest · Playwright · axe-core
+- Vercel-ready
 
 ## Getting Started
 
@@ -32,124 +91,57 @@ AI-powered digital command center for FIFA World Cup 2026 — helping fans, volu
 ### Installation
 
 ```bash
-git clone https://github.com/your-org/stadiumiq-ai.git
-cd stadiumiq-ai
+git clone https://github.com/neelamchawla/StadiumIQ-AI.git
+cd StadiumIQ-AI
 npm install
 cp .env.example .env.local
+npm run dev
 ```
 
 ### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `NEXT_PUBLIC_APP_NAME` | No | Application display name |
-| `NEXT_PUBLIC_APP_URL` | No | Public URL (default: `http://localhost:3000`) |
-| `GEMINI_API_KEY` | No* | Google Gemini API key (*falls back to mock responses) |
-| `AI_PROVIDER` | No | AI provider (`gemini`, default) |
-| `AI_MODEL` | No | Gemini model (default: `gemini-2.0-flash`) |
-| `AI_RATE_LIMIT_PER_MINUTE` | No | API rate limit per IP (default: 30) |
-| `NEXT_PUBLIC_FIREBASE_*` | No | Firebase client config |
-| `FIREBASE_ADMIN_*` | No | Firebase Admin SDK credentials |
-| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | No | Google Maps API key |
-| `CSRF_SECRET` | No | CSRF token secret |
-
-See [`.env.example`](.env.example) for the full list.
-
-### Development
-
-```bash
-npm run dev       # Start dev server at http://localhost:3000
-npm run typecheck # TypeScript check
-npm run lint      # ESLint
-npm run format    # Prettier
-```
-
-## Architecture
-
-```
-src/
-├── app/                  # Next.js App Router
-│   ├── api/              # REST API routes
-│   │   ├── ai/           # Chat & generate endpoints
-│   │   ├── crowd/        # Crowd predictions
-│   │   ├── gates/        # Gate statuses
-│   │   └── health/       # Health check
-│   ├── actions/          # Server Actions
-│   └── page.tsx          # Pages
-├── components/           # React components
-├── config/               # Environment configuration
-├── constants/            # App constants
-├── lib/                  # Utilities (sanitize, rate-limit, api-response)
-├── schemas/              # Zod validation schemas
-├── services/             # Business logic (AI, stadium data, Firebase)
-├── styles/               # Global CSS
-└── types/                # TypeScript types
-```
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed overview.
+| `GEMINI_API_KEY` | No | Enables live Gemini; otherwise deterministic fallbacks |
+| `AI_MODEL` | No | Default `gemini-2.0-flash` |
+| `AI_RATE_LIMIT_PER_MINUTE` | No | Default `30` |
+| `NEXT_PUBLIC_FIREBASE_*` | No | Optional production auth/data |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | No | Optional Maps integration |
 
 ## API Routes
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/health` | Service health check |
-| `GET` | `/api/gates` | Current gate statuses |
+| `GET` | `/api/health` | Public health (`ok` + version only) |
+| `GET` | `/api/gates` | Gate statuses |
+| `GET` | `/api/gates/recommend?accessible=1` | Best-gate recommendation |
 | `GET` | `/api/crowd` | Crowd predictions |
-| `POST` | `/api/ai/chat` | AI chat (validated, rate-limited) |
-| `POST` | `/api/ai/generate` | Raw AI generation |
+| `POST` | `/api/ai/chat` | Validated, rate-limited AI chat |
+| `POST` | `/api/ai/generate` | Disabled (`410`) |
 
-All API routes return JSON:
-
-```json
-{ "success": true, "data": { ... }, "timestamp": "..." }
-```
-
-```json
-{ "success": false, "error": { "code": "...", "message": "..." } }
-```
-
-## Server Actions
-
-- `sendChatMessage` — Validated AI chat via server action
-- `submitIncidentReport` — Incident report submission with Zod validation
-
-## Testing
+## Testing & Quality
 
 ```bash
-npm test              # Unit & component tests (Vitest)
-npm run test:watch    # Watch mode
-npm run test:coverage # Coverage report
-npm run test:e2e      # E2E tests (Playwright)
+npm run typecheck
+npm run lint
+npm test
+npx playwright install chromium
+npm run test:e2e
 ```
 
-See [docs/TESTING.md](docs/TESTING.md) for the full testing guide.
+CI: `.github/workflows/ci.yml` (typecheck, lint, unit, e2e).
 
-## Security
+See [docs/TESTING.md](docs/TESTING.md), [docs/SECURITY.md](docs/SECURITY.md), [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Input sanitization, rate limiting, Zod validation, and security headers are built in. See [docs/SECURITY.md](docs/SECURITY.md).
+## Assumptions
 
-## Accessibility
-
-WCAG 2.1 AA compliance is validated via automated axe scans. See [docs/ACCESSIBILITY.md](docs/ACCESSIBILITY.md).
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push to GitHub
-2. Import project in [Vercel](https://vercel.com)
-3. Set environment variables from `.env.example`
-4. Deploy
-
-Configuration is in [`vercel.json`](vercel.json).
-
-### Manual
-
-```bash
-npm run build
-npm start
-```
+- Single venue mock: MetLife Stadium
+- “Live” data is simulated with mild minute-bucket variation
+- Emergency AI provides guidance, not a substitute for calling staff / emergency services
+- Demo roles are for evaluation UX, not authorization
+- Multilingual preference is passed to the AI; full RTL layout is not complete
+- Repository stays on a single `main` branch for submission rules
 
 ## License
 
-Private — FIFA Stadium Intelligence AI © 2026
+Concept demo for evaluation — © 2026 StadiumIQ-AI contributors. FIFA marks used only for contextual World Cup scenario framing; no affiliation claimed.

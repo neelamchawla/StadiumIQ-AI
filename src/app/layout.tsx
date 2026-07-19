@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { CommandPalette } from "@/components/layout/command-palette";
 import { Toaster } from "@/components/ui/toaster";
 import { APP_NAME } from "@/constants";
 import "@/styles/globals.css";
@@ -49,6 +50,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </main>
               <Footer />
             </div>
+            <CommandPalette />
             <Toaster />
           </AuthProvider>
         </ThemeProvider>

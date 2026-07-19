@@ -11,10 +11,37 @@ import type {
 } from "@/types";
 import { GATES, MOCK_VENUE } from "@/constants";
 
-/** Mock data service - replace with Firestore in production */
+/** Mock data service with mild time-based variation for demo "live" feel */
+
+function minuteBucket(): number {
+  return Math.floor(Date.now() / 60_000);
+}
+
+function varyWait(base: number, seed: number): number {
+  const wobble = ((minuteBucket() + seed) % 5) - 2;
+  return Math.max(1, base + wobble);
+}
+
+function congestionFromWait(wait: number): GateStatus["congestionLevel"] {
+  if (wait <= 7) return "low";
+  if (wait <= 14) return "moderate";
+  if (wait <= 24) return "high";
+  return "critical";
+}
 
 export function getGateStatuses(): GateStatus[] {
-  return GATES.map((gate) => ({ ...gate }));
+  return GATES.map((gate, index) => {
+    const waitTimeMinutes = varyWait(gate.waitTimeMinutes, index * 3);
+    return {
+      ...gate,
+      waitTimeMinutes,
+      congestionLevel: congestionFromWait(waitTimeMinutes),
+      currentOccupancy: Math.min(
+        gate.capacity,
+        Math.round(gate.currentOccupancy * (1 + ((minuteBucket() + index) % 7) * 0.01)),
+      ),
+    };
+  });
 }
 
 const GATE_CONFIDENCE: Record<string, number> = {
@@ -26,7 +53,7 @@ const GATE_CONFIDENCE: Record<string, number> = {
 };
 
 export function getCrowdPredictions(): CrowdPrediction[] {
-  return GATES.map((gate) => ({
+  return getGateStatuses().map((gate) => ({
     gateId: gate.id,
     gateName: gate.name,
     predictedWaitMinutes: gate.waitTimeMinutes,
@@ -34,11 +61,19 @@ export function getCrowdPredictions(): CrowdPrediction[] {
     confidence: GATE_CONFIDENCE[gate.id] ?? 0.88,
     explanation: `${gate.name} has ${gate.congestionLevel} congestion with approximately ${gate.waitTimeMinutes} minute wait.`,
     recommendedAlternative:
-      gate.congestionLevel === "high" ? "Gate A - North" : undefined,
+      gate.congestionLevel === "high" || gate.congestionLevel === "critical"
+        ? "Gate A - North"
+        : undefined,
   }));
 }
 
 export function getDashboardWidgets(): DashboardWidget[] {
+  const gates = getGateStatuses();
+  const best = [...gates].sort((a, b) => a.waitTimeMinutes - b.waitTimeMinutes)[0];
+  const avgWait = Math.round(
+    gates.reduce((sum, gate) => sum + gate.waitTimeMinutes, 0) / Math.max(gates.length, 1),
+  );
+
   return [
     {
       id: "crowd",
@@ -53,7 +88,7 @@ export function getDashboardWidgets(): DashboardWidget[] {
       id: "gate-a",
       title: "Best Gate",
       type: "gate",
-      value: "Gate A",
+      value: best?.name.split(" - ")[0] ?? "Gate A",
       trend: "stable",
       status: "normal",
     },
@@ -102,17 +137,17 @@ export function getDashboardWidgets(): DashboardWidget[] {
       id: "ai-rec",
       title: "AI Recommendation",
       type: "ai",
-      value: "Use Gate A",
+      value: `Use ${best?.name.split(" - ")[0] ?? "Gate A"}`,
       status: "normal",
     },
     {
       id: "queue",
       title: "Avg Queue Time",
       type: "queue",
-      value: "12 min",
+      value: `${avgWait} min`,
       trend: "down",
       trendValue: "-3 min",
-      status: "warning",
+      status: avgWait > 15 ? "warning" : "normal",
     },
     {
       id: "accessibility",
@@ -305,11 +340,12 @@ export function getCrowdHeatmapData(): Array<{
   lat: number;
   lng: number;
 }> {
+  const wobble = (minuteBucket() % 10) / 100;
   return [
-    { section: "North Stand", density: 0.45, lat: 40.814, lng: -74.074 },
-    { section: "East Stand", density: 0.72, lat: 40.812, lng: -74.072 },
-    { section: "South Stand", density: 0.85, lat: 40.811, lng: -74.074 },
-    { section: "West Stand", density: 0.38, lat: 40.812, lng: -74.076 },
-    { section: "VIP Zone", density: 0.55, lat: 40.813, lng: -74.073 },
+    { section: "North Stand", density: Math.min(0.95, 0.45 + wobble), lat: 40.814, lng: -74.074 },
+    { section: "East Stand", density: Math.min(0.95, 0.72 + wobble), lat: 40.812, lng: -74.072 },
+    { section: "South Stand", density: Math.min(0.95, 0.85 + wobble), lat: 40.811, lng: -74.074 },
+    { section: "West Stand", density: Math.max(0.2, 0.38 - wobble), lat: 40.812, lng: -74.076 },
+    { section: "VIP Zone", density: Math.min(0.95, 0.55 + wobble / 2), lat: 40.813, lng: -74.073 },
   ];
 }

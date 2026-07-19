@@ -37,7 +37,7 @@ describe("formatDistance", () => {
 describe("getCongestionColor", () => {
   it("returns correct color classes for each level", () => {
     expect(getCongestionColor("low")).toContain("green");
-    expect(getCongestionColor("moderate")).toContain("yellow");
+    expect(getCongestionColor("moderate")).toContain("amber");
     expect(getCongestionColor("high")).toContain("orange");
     expect(getCongestionColor("critical")).toContain("red");
   });

@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Bot, Loader2, Map } from "lucide-react";
-import { getCrowdHeatmapData, getIncidents } from "@/services/stadium/data";
+import { getCrowdHeatmapData } from "@/services/stadium/data";
 import { askStadiumAI } from "@/services/ai";
+import { fetchIncidents } from "@/app/actions/incident";
+import { loadPreferences } from "@/lib/preferences";
+import type { IncidentReport } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,17 +20,23 @@ const SEVERITY_VARIANTS = {
 };
 
 const STATUS_COLORS = {
-  open: "bg-yellow-500/10 text-yellow-600",
-  investigating: "bg-blue-500/10 text-blue-600",
-  resolved: "bg-green-500/10 text-green-600",
+  open: "bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200",
+  investigating: "bg-blue-100 text-blue-950 dark:bg-blue-500/20 dark:text-blue-200",
+  resolved: "bg-green-100 text-green-900 dark:bg-green-500/20 dark:text-green-200",
 };
 
 export function OrganizerDashboard() {
-  const incidents = useMemo(() => getIncidents(), []);
   const heatmapData = useMemo(() => getCrowdHeatmapData(), []);
+  const [incidents, setIncidents] = useState<IncidentReport[]>([]);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const isFetchingRef = useRef(false);
+
+  const refreshIncidents = useCallback(async () => {
+    const next = await fetchIncidents();
+    setIncidents(next);
+    return next;
+  }, []);
 
   const loadSummary = useCallback(async () => {
     if (isFetchingRef.current) return;
@@ -35,26 +44,36 @@ export function OrganizerDashboard() {
     isFetchingRef.current = true;
     setIsLoadingSummary(true);
     try {
+      const currentIncidents = await refreshIncidents();
+      const prefs = loadPreferences();
       const response = await askStadiumAI({
         feature: "organizer",
-        message: "Provide an operational summary of current stadium status.",
+        message: "Provide an operational summary of current stadium status and open incidents.",
+        language: prefs.language,
         context: {
-          incidents: incidents.length,
-          heatmap: heatmapData,
+          role: "organizer",
+          language: prefs.language,
+          includeStadiumData: true,
         },
       });
-      setAiSummary(response.message);
+      setAiSummary(
+        `${response.message}\n\nOpen incidents tracked: ${currentIncidents.filter((i) => i.status !== "resolved").length}.`,
+      );
     } catch {
       setAiSummary("Unable to generate AI summary at this time.");
     } finally {
       setIsLoadingSummary(false);
       isFetchingRef.current = false;
     }
-  }, [heatmapData, incidents.length]);
+  }, [refreshIncidents]);
 
   useEffect(() => {
     void loadSummary();
-  }, [loadSummary]);
+    const timer = setInterval(() => {
+      void refreshIncidents();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [loadSummary, refreshIncidents]);
 
   return (
     <div className="space-y-6">
@@ -63,11 +82,11 @@ export function OrganizerDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                <Bot className="h-5 w-5 text-primary" />
+                <Bot className="h-5 w-5 text-primary" aria-hidden="true" />
               </div>
               <div>
                 <CardTitle>AI Operations Summary</CardTitle>
-                <CardDescription>Real-time intelligence briefing</CardDescription>
+                <CardDescription>Match-day intelligence briefing (simulated venue data)</CardDescription>
               </div>
             </div>
             <Button
@@ -90,12 +109,14 @@ export function OrganizerDashboard() {
         </CardHeader>
         <CardContent>
           {isLoadingSummary && !aiSummary ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-2 text-muted-foreground" aria-live="polite">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               Generating summary...
             </div>
           ) : (
-            <p className="text-sm leading-relaxed">{aiSummary}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed" aria-live="polite">
+              {aiSummary}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -104,10 +125,12 @@ export function OrganizerDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-yellow-600" aria-hidden="true" />
               Active Incidents
             </CardTitle>
-            <CardDescription>{incidents.length} incidents requiring attention</CardDescription>
+            <CardDescription>
+              {incidents.length} incidents · volunteer reports appear here in near real time
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {incidents.map((incident) => (
@@ -123,7 +146,9 @@ export function OrganizerDashboard() {
                   <Badge variant={SEVERITY_VARIANTS[incident.severity]}>{incident.severity}</Badge>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{incident.location}</span>
+                  <span>
+                    {incident.location} · {incident.reportedBy}
+                  </span>
                   <span className={cn("rounded-full px-2 py-0.5 font-medium", STATUS_COLORS[incident.status])}>
                     {incident.status}
                   </span>
@@ -136,13 +161,17 @@ export function OrganizerDashboard() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Map className="h-5 w-5 text-primary" />
+              <Map className="h-5 w-5 text-primary" aria-hidden="true" />
               Crowd Density Heatmap
             </CardTitle>
             <CardDescription>Section-level occupancy visualization</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-slate-900/10 to-slate-900/5 dark:from-slate-950/50 dark:to-slate-900/30">
+            <div
+              className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/50 bg-gradient-to-br from-slate-900/10 to-slate-900/5 dark:from-slate-950/50 dark:to-slate-900/30"
+              role="img"
+              aria-label="Crowd density heatmap by stadium section"
+            >
               {heatmapData.map((section) => {
                 const intensity = section.density;
                 const size = 40 + intensity * 60;
@@ -173,7 +202,7 @@ export function OrganizerDashboard() {
               })}
               <div className="absolute bottom-3 left-3 rounded-lg bg-background/80 px-3 py-2 text-xs backdrop-blur-sm">
                 <p className="font-medium">Density Heatmap</p>
-                <p className="text-muted-foreground">Red = higher density</p>
+                <p className="text-muted-foreground">Larger / redder = higher density</p>
               </div>
             </div>
 
@@ -182,7 +211,7 @@ export function OrganizerDashboard() {
                 <div key={section.section} className="flex items-center justify-between text-sm">
                   <span>{section.section}</span>
                   <div className="flex items-center gap-2">
-                    <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
+                    <div className="h-2 w-24 overflow-hidden rounded-full bg-muted" aria-hidden="true">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-red-500"
                         style={{ width: `${section.density * 100}%` }}

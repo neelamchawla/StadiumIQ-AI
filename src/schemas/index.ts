@@ -28,6 +28,19 @@ export const accessibilityNeedsSchema = z.object({
   companionRequired: z.boolean().default(false),
 });
 
+export const aiContextSchema = z
+  .object({
+    role: userRoleSchema.optional(),
+    language: supportedLanguagesSchema.optional(),
+    accessibilityNeeds: accessibilityNeedsSchema.partial().optional(),
+    emergencyType: z.string().max(40).optional(),
+    preferredGate: z.string().max(40).optional(),
+    requireAccessible: z.boolean().optional(),
+    location: z.string().max(120).optional(),
+    includeStadiumData: z.boolean().optional(),
+  })
+  .strict();
+
 export const chatRequestSchema = z.object({
   message: z
     .string()
@@ -47,7 +60,7 @@ export const chatRequestSchema = z.object({
       "organizer",
     ])
     .default("assistant"),
-  context: z.record(z.unknown()).optional(),
+  context: aiContextSchema.optional(),
 });
 
 export const crowdPredictionRequestSchema = z.object({

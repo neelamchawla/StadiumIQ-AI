@@ -5,8 +5,12 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { sanitizePromptInput } from "@/lib/sanitize";
 import { generateId } from "@/lib/utils";
 import { chatRequestSchema, type ChatRequest } from "@/schemas";
+import {
+  buildStadiumContext,
+  formatContextBlock,
+  sanitizeAIContext,
+} from "@/services/ai/context";
 import { generateWithGemini } from "@/services/ai/gemini.server";
-import { SYSTEM_PROMPTS } from "@/services/ai/prompts";
 import { headers } from "next/headers";
 
 export interface ChatActionResult {
@@ -17,6 +21,7 @@ export interface ChatActionResult {
     confidence?: number;
     feature: ChatRequest["feature"];
     conversationId: string;
+    source?: "gemini" | "fallback";
   };
   error?: string;
 }
@@ -25,8 +30,9 @@ export async function sendChatMessage(input: ChatRequest): Promise<ChatActionRes
   try {
     const headersList = await headers();
     const clientIp =
-      headersList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       headersList.get("x-real-ip") ??
+      headersList.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ??
+      headersList.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
       "anonymous";
 
     const rateLimit = checkRateLimit(`chat-action:${clientIp}`, {
@@ -44,14 +50,20 @@ export async function sendChatMessage(input: ChatRequest): Promise<ChatActionRes
       return { success: false, error: "Invalid chat request" };
     }
 
-    const { message, feature, language, context } = parsed.data;
+    const { message, feature, language } = parsed.data;
+    const safeContext = sanitizeAIContext(parsed.data.context);
+    const stadiumContext = buildStadiumContext(feature, {
+      ...safeContext,
+      language: safeContext.language ?? language,
+    });
     const sanitizedMessage = sanitizePromptInput(message);
 
-    const contextBlock = context ? `\nContext:\n${JSON.stringify(context)}` : "";
-    const languageBlock = language ? `\nPreferred language: ${language}` : "";
-    const prompt = `${SYSTEM_PROMPTS[feature]}${languageBlock}${contextBlock}\n\nUser: ${sanitizedMessage}`;
-
-    const result = await generateWithGemini({ feature, prompt });
+    const result = await generateWithGemini({
+      feature,
+      userPrompt: sanitizedMessage,
+      language,
+      contextBlock: formatContextBlock(stadiumContext),
+    });
 
     return {
       success: true,
@@ -61,6 +73,7 @@ export async function sendChatMessage(input: ChatRequest): Promise<ChatActionRes
         confidence: result.confidence,
         feature,
         conversationId: parsed.data.conversationId ?? generateId(),
+        source: result.source,
       },
     };
   } catch (error) {

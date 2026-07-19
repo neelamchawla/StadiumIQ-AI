@@ -1,93 +1,80 @@
 # Security Practices
 
-## Input Validation
+This document describes **controls that are actually implemented** in the demo, and what remains for production.
 
-All API endpoints and server actions validate input with **Zod schemas** before processing. Invalid requests return `400` with structured error details:
+## Implemented Controls
 
-```json
-{
-  "success": false,
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request body",
-    "details": { ... }
-  }
-}
-```
+### Input Validation
 
-## Input Sanitization
+API routes and server actions validate input with **Zod schemas** before processing. Invalid requests return `400` with structured error details.
 
-User-provided text is sanitized before being sent to AI models:
+Chat context is **allowlisted** via `aiContextSchema` / `sanitizeAIContext` — free-form attacker JSON is not concatenated into prompts.
 
-| Function | Purpose |
-|----------|---------|
-| `escapeHtml()` | Prevents XSS in rendered output |
-| `sanitizePromptInput()` | Strips control chars, role injection prefixes, and dangerous HTML tags |
-| `sanitizeUrl()` | Validates URLs to http/https only |
-| `stripHtml()` | Removes HTML tags from strings |
-| `maskSensitive()` | Masks secrets in logs |
+### Prompt Handling
 
-### Prompt Injection Prevention
+- User messages are sanitized with `sanitizePromptInput` (length cap, control chars, role-prefix stripping).
+- Gemini calls use `systemInstruction` + user content (`gemini.server.ts`), not a single concatenated attacker-controlled prompt.
+- Public raw-prompt endpoint `POST /api/ai/generate` is **disabled** (`410 ENDPOINT_REMOVED`).
+- Clients must use `sendChatMessage` or `POST /api/ai/chat`.
 
-`sanitizePromptInput` removes patterns like `system:`, `assistant:`, and `user:` prefixes that could hijack AI context, and strips `<script>`, `<iframe>`, and similar tags.
+### Rate Limiting
 
-## Rate Limiting
+AI chat and incident submission use an in-memory rate limiter keyed by client IP:
 
-API routes use an in-memory rate limiter (`checkRateLimit`) keyed by client IP:
+- Default: 30 chat requests / minute (`AI_RATE_LIMIT_PER_MINUTE`)
+- Incident reports: capped lower
+- IP sourcing prefers `x-real-ip` / `x-vercel-forwarded-for` over the first `X-Forwarded-For` hop
 
-- Default: 30 requests per minute per IP
-- Configurable via `AI_RATE_LIMIT_PER_MINUTE`
-- Returns `429 RATE_LIMITED` when exceeded
+> **Production note:** Replace in-memory limiting with Redis or Vercel KV for multi-instance deployments.
 
-> **Production note:** Replace in-memory rate limiting with Redis or Vercel KV for multi-instance deployments.
+### HTTP Security Headers
 
-## HTTP Security Headers
+Configured in `next.config.ts` (and mirrored partially in `vercel.json`):
 
-Configured in `next.config.ts` and `vercel.json`:
-
-| Header | Value |
-|--------|-------|
+| Header | Purpose |
+|--------|---------|
+| `Content-Security-Policy` | Restricts script/style/connect sources |
+| `Strict-Transport-Security` | Enforces HTTPS on supporting hosts |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
-| `X-XSS-Protection` | `1; mode=block` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Permissions-Policy` | Restricts camera, allows microphone/geolocation for self |
+| `Permissions-Policy` | Camera off; mic/geo self |
 
-## API Key Management
+### API Key Management
 
-- `GEMINI_API_KEY` is server-only (never prefixed with `NEXT_PUBLIC_`)
-- Firebase Admin credentials use server environment variables only
-- Client Firebase config uses public env vars (safe by design with Firebase security rules)
+- `GEMINI_API_KEY` is server-only (never `NEXT_PUBLIC_`)
+- UI never talks to Gemini directly — only via server action / chat API
+- Health endpoint does **not** disclose whether secrets are configured
 
-## CSRF Protection
+### Error Handling
 
-`CSRF_SECRET` is configured for future CSRF token validation on mutating server actions.
+- Unexpected errors return generic `500 INTERNAL_ERROR`
+- Details are logged server-side only
 
-## Error Handling
+### Incident Reporting
 
-- API routes catch unexpected errors and return generic `500 INTERNAL_ERROR` messages
-- Detailed error information is logged server-side only (`console.error`)
-- No stack traces or internal paths are exposed to clients
+`submitIncidentReport` validates input, sanitizes fields, rate-limits, and stores reports in a process-local store for the volunteer → organizer demo loop. Production should authenticate reporters and persist to Firestore with an audit trail.
 
-## Dependency Security
+## Demo Auth (Honest Scope)
 
-- Run `npm audit` regularly
-- Keep Next.js and dependencies updated
-- Use `.env.local` for secrets (gitignored)
+Demo auth is **localStorage-based role switching** for judges (fan / volunteer / organizer). It is **not** production authentication.
 
-## Incident Reporting
+- Do not treat demo roles as authorization for sensitive operations
+- Production should use Firebase Auth (or equivalent) + server-side token verification + middleware RBAC
 
-The `submitIncidentReport` server action validates severity levels and description length. Reports are currently mocked — production should:
+## Not Claimed / Not Implemented
 
-1. Authenticate the reporter
-2. Persist to Firestore with audit trail
-3. Notify operations staff for `high` and `critical` severity
+| Topic | Status |
+|-------|--------|
+| CSRF token secret | Removed — rely on SameSite cookies + Next.js server action origin checks; add explicit CSRF if exposing cookie-auth mutations cross-site |
+| Firebase Admin SDK | Not bundled until Admin features exist |
+| Redis rate limits | Documented upgrade path only |
+| Production RBAC | Demo role switcher only |
 
 ## Recommendations for Production
 
-1. Enable Firebase Auth with role-based access control
-2. Add Redis-backed rate limiting
-3. Implement Content Security Policy (CSP) headers
-4. Enable Vercel WAF or Cloudflare for DDoS protection
-5. Rotate API keys periodically
-6. Add request signing for organizer/volunteer endpoints
+1. Enable Firebase Auth with verified ID tokens on server actions/API
+2. Add Redis/KV rate limiting and WAF
+3. Persist incidents with audit trail
+4. Rotate API keys periodically
+5. Run `npm audit` in CI and keep Next.js patched

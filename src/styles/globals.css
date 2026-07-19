@@ -13,9 +13,9 @@
     --primary: 221 83% 27%;
     --primary-foreground: 210 40% 98%;
     --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 46%;
+    --secondary-foreground: 224 30% 20%;
     --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted-foreground: 224 30% 20%;
     --accent: 142 76% 36%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 84% 60%;
@@ -64,16 +64,18 @@
 }
 
 @layer utilities {
+  /* Opaque surfaces only — translucent “glass” fails axe color-contrast on light backgrounds */
   .glass {
-    @apply border border-white/10 bg-white/10 backdrop-blur-xl dark:bg-black/20;
+    @apply border border-border bg-card text-foreground shadow-sm;
   }
 
   .glass-card {
-    @apply glass rounded-xl shadow-lg;
+    @apply glass rounded-xl;
   }
 
+  /* Solid primary keeps WCAG contrast; subtle gradient accent is decorative only */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary via-accent to-fifa-gold bg-clip-text text-transparent;
+    @apply text-primary;
   }
 
   .skip-link {

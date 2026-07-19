@@ -49,7 +49,11 @@ export function SustainabilityTracker() {
               <p className="text-4xl font-bold">{metrics.carbonSavedKg} kg</p>
               <p className="text-sm text-muted-foreground">CO₂ saved of {goalKg} kg goal</p>
             </div>
-            <Progress value={progressPct} className="mt-3 h-3" />
+            <Progress
+              value={Number.isFinite(progressPct) ? progressPct : 0}
+              className="mt-3 h-3"
+              aria-label={`Carbon savings progress: ${metrics.carbonSavedKg} of ${goalKg} kilograms`}
+            />
           </div>
         </div>
       </Card>

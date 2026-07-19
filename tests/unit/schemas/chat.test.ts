@@ -61,11 +61,23 @@ describe("chatRequestSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts optional context object", () => {
+  it("accepts allowlisted context fields", () => {
+    const result = chatRequestSchema.safeParse({
+      message: "Route to Section 112",
+      context: {
+        requireAccessible: true,
+        role: "fan",
+        preferredGate: "gate-a",
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unknown context fields", () => {
     const result = chatRequestSchema.safeParse({
       message: "Route to Section 112",
       context: { venueId: "metlife-stadium", section: "112" },
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 });

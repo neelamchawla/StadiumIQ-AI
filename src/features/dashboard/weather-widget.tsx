@@ -28,8 +28,8 @@ export function WeatherWidget() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center gap-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400/20 to-blue-500/20">
-            <Cloud className="h-8 w-8 text-sky-500" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-100 dark:bg-sky-500/20">
+            <Cloud className="h-8 w-8 text-sky-800 dark:text-sky-300" aria-hidden="true" />
           </div>
           <div>
             <p className="text-3xl font-bold">{weather.temperature}°F</p>
@@ -39,14 +39,14 @@ export function WeatherWidget() {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
-            <Droplets className="h-4 w-4 text-blue-500" />
+            <Droplets className="h-4 w-4 text-blue-800 dark:text-blue-300" aria-hidden="true" />
             <div>
               <p className="text-xs text-muted-foreground">Humidity</p>
               <p className="text-sm font-semibold">{weather.humidity}%</p>
             </div>
           </div>
           <div className="flex items-center gap-2 rounded-lg bg-muted/50 p-3">
-            <Wind className="h-4 w-4 text-teal-500" />
+            <Wind className="h-4 w-4 text-teal-800 dark:text-teal-300" aria-hidden="true" />
             <div>
               <p className="text-xs text-muted-foreground">Wind</p>
               <p className="text-sm font-semibold">{weather.windSpeed} mph</p>

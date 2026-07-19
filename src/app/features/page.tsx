@@ -37,7 +37,7 @@ const FEATURE_LINKS: Record<string, string> = {
   crowd_prediction: "/dashboard",
   route_recommendation: "/stadium",
   accessibility: "/accessibility",
-  emergency: "/chat",
+  emergency: "/stadium",
   sustainability: "/dashboard",
   volunteer: "/volunteer",
   organizer: "/organizer",

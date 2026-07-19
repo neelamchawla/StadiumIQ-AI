@@ -56,7 +56,7 @@ export const AI_FEATURES = [
   {
     id: "accessibility",
     title: "Accessibility Assistant",
-    description: "Voice-enabled guidance for all accessibility needs",
+    description: "Accessible routing with optional browser voice input/read-aloud",
     icon: "Accessibility",
   },
   {
@@ -151,14 +151,17 @@ export const MOCK_GATES = [
     capacity: 2000,
     currentOccupancy: 800,
     isAccessible: true,
-    status: "open.pyopen" as const,
+    status: "open" as const,
   },
 ] as const;
 
-// Fix the typo in gate-vip status
-export const GATES = MOCK_GATES.map((gate) =>
-  gate.id === "gate-vip" ? { ...gate, status: "open" as const } : gate,
-);
+export const GATES = MOCK_GATES.map((gate) => ({ ...gate }));
+
+export const ROLE_NAV: Record<"fan" | "volunteer" | "organizer", readonly string[]> = {
+  fan: ["/", "/chat", "/stadium", "/dashboard", "/accessibility", "/features"],
+  volunteer: ["/", "/volunteer", "/chat", "/stadium", "/dashboard"],
+  organizer: ["/", "/organizer", "/dashboard", "/stadium", "/chat"],
+} as const;
 
 export const EMERGENCY_TYPES = [
   { id: "medical", label: "Medical Emergency", icon: "HeartPulse", priority: "critical" },

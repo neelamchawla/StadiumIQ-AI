@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Loader2, MapPin, Plus } from "lucide-react";
+import { submitIncidentReport } from "@/app/actions/incident";
 import { getVolunteerTasks } from "@/services/stadium/data";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,15 +36,43 @@ export function VolunteerDashboard() {
   const tasks = getVolunteerTasks();
   const [showForm, setShowForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [incidentType, setIncidentType] = useState("crowd");
+  const [severity, setSeverity] = useState<"low" | "medium" | "high" | "critical">("medium");
 
   const handleSubmitIncident = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 1000));
-    toast({ title: "Incident Reported", description: "Your report has been submitted to organizers." });
-    setShowForm(false);
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    const location = String(formData.get("location") ?? "");
+    const description = String(formData.get("description") ?? "");
+
+    const result = await submitIncidentReport({
+      type: incidentType,
+      location,
+      description,
+      severity,
+    });
+
+    if (result.success) {
+      toast({
+        title: "Incident Reported",
+        description: "Your report is now visible on the Organizer dashboard.",
+      });
+      setShowForm(false);
+      form.reset();
+      setIncidentType("crowd");
+      setSeverity("medium");
+    } else {
+      toast({
+        title: "Submission failed",
+        description: result.error ?? "Could not submit incident.",
+        variant: "destructive",
+      });
+    }
+
     setIsSubmitting(false);
-    (e.target as HTMLFormElement).reset();
   };
 
   return (
@@ -53,8 +82,8 @@ export function VolunteerDashboard() {
           <h2 className="text-2xl font-bold">Volunteer Tasks</h2>
           <p className="text-muted-foreground">Your assigned duties for today&apos;s match</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setShowForm(!showForm)} aria-expanded={showForm}>
+          <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Report Incident
         </Button>
       </div>
@@ -70,7 +99,7 @@ export function VolunteerDashboard() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="incident-type">Incident Type</Label>
-                  <Select name="type" required>
+                  <Select value={incidentType} onValueChange={setIncidentType}>
                     <SelectTrigger id="incident-type">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -89,16 +118,31 @@ export function VolunteerDashboard() {
                 </div>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="incident-severity">Severity</Label>
+                <Select value={severity} onValueChange={(v) => setSeverity(v as typeof severity)}>
+                  <SelectTrigger id="incident-severity">
+                    <SelectValue placeholder="Select severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="incident-description">Description</Label>
                 <Textarea
                   id="incident-description"
                   name="description"
                   placeholder="Describe the incident..."
                   required
+                  minLength={10}
                 />
               </div>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
                 Submit Report
               </Button>
             </form>
@@ -121,11 +165,11 @@ export function VolunteerDashboard() {
                   <p className="text-sm text-muted-foreground">{task.description}</p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3.5 w-3.5" />
+                      <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                       {task.location}
                     </span>
                     <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
+                      <Clock className="h-3.5 w-3.5" aria-hidden="true" />
                       Due {new Date(task.dueAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   </div>
@@ -133,12 +177,12 @@ export function VolunteerDashboard() {
                 <div
                   className={cn(
                     "flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                    task.status === "completed" && "bg-green-500/10 text-green-600",
-                    task.status === "in_progress" && "bg-yellow-500/10 text-yellow-600",
+                    task.status === "completed" && "bg-green-100 text-green-900 dark:bg-green-500/20 dark:text-green-200",
+                    task.status === "in_progress" && "bg-amber-100 text-amber-950 dark:bg-amber-500/20 dark:text-amber-200",
                     task.status === "pending" && "bg-muted text-muted-foreground",
                   )}
                 >
-                  <StatusIcon className="h-3.5 w-3.5" />
+                  <StatusIcon className="h-3.5 w-3.5" aria-hidden="true" />
                   {task.status.replace("_", " ")}
                 </div>
               </CardContent>
